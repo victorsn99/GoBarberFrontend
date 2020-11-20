@@ -1,9 +1,17 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
+import { useHistory } from 'react-router-dom';
 import api from '../services/api';
+
+interface User {
+  id: string;
+  avatar_url: string;
+  email: string;
+  name: string;
+}
 
 interface AuthState {
   token: string;
-  user: object;
+  user: User;
 }
 
 interface SignInCredentials {
@@ -12,9 +20,10 @@ interface SignInCredentials {
 }
 
 interface AuthContextData {
-  user: object;
+  user: User;
   signIn(crendentials: SignInCredentials): Promise<void>;
   signOut(): void;
+  updateUser(user: User): void; 
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData); //burrlar tipagem
@@ -25,6 +34,8 @@ export const AuthProvider: React.FC = ({ children }) => {
     const user = localStorage.getItem('@GoBarber:user');
 
     if (token && user) {
+      api.defaults.headers.authorization = `Bearer ${token}`;
+      
       return { token, user: JSON.parse(user)};
     }
 
@@ -32,14 +43,19 @@ export const AuthProvider: React.FC = ({ children }) => {
   });
 
   const signIn = useCallback(async({ email, password }) => {
-    const response = await api.post('/session', {
+    const response = await api.post('/session/auth', {
       email,
       password,
     });
     const { token, user } = response.data;
 
+    console.log(token, user);
+    
+
     localStorage.setItem('@GoBarber:token', token);
     localStorage.setItem('@GoBarber:user', JSON.stringify(user));
+
+    setData({ token, user });
   }, []);
 
   const signOut = useCallback(() => {
@@ -49,8 +65,16 @@ export const AuthProvider: React.FC = ({ children }) => {
     setData({} as AuthState);
   }, []);
 
+  const updateUser = useCallback((user: User) => {
+    localStorage.setItem('@GoBarber:user', JSON.stringify(user));
+    setData({
+      token: data.token,
+      user,
+    });
+  }, [setData, data.token]);
+
   return (
-    <AuthContext.Provider value={{ user: data.user, signIn, signOut }}>
+    <AuthContext.Provider value={{ user: data.user, signIn, updateUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );
